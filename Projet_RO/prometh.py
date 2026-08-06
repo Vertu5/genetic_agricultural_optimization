@@ -1,14 +1,20 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-#Création de la matrice data(elle recense les alternatives et les critères)
+# Normalisation adaptative (Minimisation pour C et P, Maximisation pour R)
 def normalize(data):
     min_val = np.min(data, axis=0)
     max_val = np.max(data, axis=0)
-    return (data - min_val) / (max_val - min_val)
+    range_val = np.where((max_val - min_val) == 0, 1.0, (max_val - min_val))
+    
+    norm = (data - min_val) / range_val
+    # Inversion pour les objectifs à minimiser:
+    norm[:, 0] = 1.0 - norm[:, 0]  # Compactness C: plus petit = meilleur
+    norm[:, 1] = 1.0 - norm[:, 1]  # Proximity P: plus petit = meilleur
+    # Productivity R est déjà maximisée (norm[:, 2] inchangée)
+    return norm
 
 # Étape de pondération
-# il faut pouvoir justifier les poids qui ont été donnés
 def weigh(data, weights):
     return data * weights
 
@@ -18,7 +24,7 @@ def positive_flow(data):
     p_matrix = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            p_matrix[i][j] = np.sum(np.maximum(data[j] - data[i], 0))
+            p_matrix[i][j] = np.sum(np.maximum(data[i] - data[j], 0))
     return p_matrix
 
 def negative_flow(data):
@@ -26,7 +32,7 @@ def negative_flow(data):
     n_matrix = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            n_matrix[i][j] = np.sum(np.maximum(data[i] - data[j], 0))
+            n_matrix[i][j] = np.sum(np.maximum(data[j] - data[i], 0))
     return n_matrix
 
 # Étape de calcul des indices de préférence
@@ -36,11 +42,11 @@ def preference_index(p_matrix, n_matrix):
     s_minus = np.sum(n_matrix, axis=1)
     index = np.zeros(n)
     for i in range(n):
-        index[i] = s_minus[i] / (s_minus[i] + s_plus[i])
+        total = s_minus[i] + s_plus[i]
+        index[i] = s_plus[i] / total if total > 0 else 0.0
     return index
 
-
-# Classement final
+# Classement final PROMETHEE II
 def promethee(data, weights):
     n_data = normalize(data)
     w_data = weigh(n_data, weights)

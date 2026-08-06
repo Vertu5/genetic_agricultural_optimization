@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+import os
+import glob
 import random
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 from scipy.spatial.distance import cdist
-from scipy.interpolate import griddata
 
 from mapfunctions import *
 from utils import *
@@ -43,7 +45,7 @@ budget_limit = 500
 Min_prox = select_proximity(proximity_map, DecisionMap, cost_map, budget=budget_limit)
 Max_prod = select_productivity(productivity_map, DecisionMap, cost_map, budget=budget_limit)
 
-# Visualisation des cartes
+# Visualisation des cartes d'entrée
 fig, axs = plt.subplots(2, 2, figsize=(12, 8))
 axs[0, 0].imshow(Map, cmap="coolwarm")
 axs[0, 0].set_title("Usage Map")
@@ -63,7 +65,7 @@ plt.close()
 
 # 2. Execution de l'algorithme génétique multi-objectifs (NSGA-II)
 print("--- Lancement du GA Multi-Objectifs (NSGA-II) ---")
-best_solutions = multi_objective_ga(
+best_solutions, history_per_gen = multi_objective_ga(
     DecisionMap, 
     cost_map, 
     productivity_map, 
@@ -73,13 +75,13 @@ best_solutions = multi_objective_ga(
     num_generations=20
 )
 
-# 3. Évaluation des objectifs pour chaque solution trouvée
+# 3. Évaluation des objectifs physiques bruts pour chaque solution trouvée
 global_obj = []
 for solution in best_solutions:
     subgroup_coords, _ = subgroups(solution.copy()) 
     global_obj.append(calculate_global_objectives(subgroup_coords, proximity_map, productivity_map))
 
-# 4. Calcul de la frontière de Pareto avec Tri par Dominance (NSGA-II)
+# 4. Calcul de la frontière de Pareto avec Tri par Dominance Directe (NSGA-II)
 fronts, _ = fast_non_dominated_sort(global_obj)
 if fronts:
     indices_pareto = fronts[0]
@@ -93,19 +95,16 @@ data = np.array(pareto_points).reshape(-1, 3)
 data_unique, unique_indices = np.unique(data, axis=0, return_index=True)
 indices_pareto = [indices_pareto[idx] for idx in unique_indices]
 
-pareto_x = [p[0] for p in data_unique]
-pareto_y = [p[1] for p in data_unique]
-pareto_z = [p[2] for p in data_unique]
-
 # 5. Classement des solutions par la méthode PROMETHEE II
-weights = np.array([0.2, 0.4, 0.4]) # [Compactness, Proximity, Productivity]
+# Poids: [Compacité C (Min), Proximité P (Min), Productivité R (Max)]
+weights = np.array([0.2, 0.4, 0.4])
 indices = promethee(data_unique, weights)
 
 sorted_data = [data_unique[i] for i in indices]
 sorted_pareto = [indices_pareto[i] for i in indices]
 
-# Sauvegarde des résultats Pareto dans pareto.csv
-headers = ["compactness_score", "proximity_score", "productivity_score"]
+# Sauvegarde des résultats Pareto dans pareto.csv (Valeurs physiques brutes)
+headers = ["compactness_C", "proximity_P", "productivity_R"]
 with open("pareto.csv", "w", newline="") as file:
     writer = csv.writer(file)
     writer.writerow(headers)
@@ -113,72 +112,101 @@ with open("pareto.csv", "w", newline="") as file:
 
 print(f"Frontière de Pareto extraite: {len(data_unique)} solutions non-dominées enregistrées dans pareto.csv.")
 
-# 6. Visualisation de la Frontière de Pareto
-sorted_x = [p[0] for p in sorted_data]
-sorted_y = [p[1] for p in sorted_data]
-sorted_z = [p[2] for p in sorted_data]
+# 6. Génération des GIFs Animés (Évolution Spatiale & Convergence Pareto)
+print("--- Génération des animations GIF ---")
+temp_dir = "temp_frames"
+os.makedirs(temp_dir, exist_ok=True)
 
-try:
-    import mpl_toolkits.mplot3d
-    fig = plt.figure(figsize=(14, 10))
-    ax1 = fig.add_subplot(2, 2, 1, projection='3d')
-    ax1.scatter3D(sorted_x, sorted_y, sorted_z, c=range(len(sorted_data)), cmap='coolwarm', s=50)
-    ax1.set_xlabel('1 / Compactness')
-    ax1.set_ylabel('1 / Proximity')
-    ax1.set_zlabel('Productivity')
-    ax1.set_title('Frontière de Pareto - Vue 3D')
+spatial_frames = []
+pareto_frames = []
 
-    ax2 = fig.add_subplot(2, 2, 2)
-    sc2 = ax2.scatter(sorted_x, sorted_y, c=sorted_z, cmap='viridis', s=50)
-    ax2.set_xlabel('1 / Compactness')
-    ax2.set_ylabel('1 / Proximity')
-    ax2.set_title('Proximity vs Compactness (Color=Productivity)')
-    plt.colorbar(sc2, ax=ax2)
+for step in history_per_gen:
+    gen = step['generation']
+    pareto_front = step['pareto_front']
+    pareto_fits = step['pareto_fitness']
 
-    ax3 = fig.add_subplot(2, 2, 3)
-    sc3 = ax3.scatter(sorted_x, sorted_z, c=sorted_y, cmap='plasma', s=50)
-    ax3.set_xlabel('1 / Compactness')
-    ax3.set_ylabel('Productivity')
-    ax3.set_title('Productivity vs Compactness (Color=Proximity)')
-    plt.colorbar(sc3, ax=ax3)
+    # --- Frame 1: Évolution de la Carte Spatiale ---
+    fig_sp, ax_sp = plt.subplots(figsize=(8, 6))
+    if pareto_front:
+        top_sol = pareto_front[0]
+        ax_sp.imshow(top_sol, cmap='coolwarm')
+    else:
+        ax_sp.imshow(Map, cmap='coolwarm')
+    ax_sp.set_title(f"NSGA-II - Génération {gen:02d} : Configuration Spatiale")
+    sp_path = os.path.join(temp_dir, f"spatial_{gen:02d}.png")
+    plt.tight_layout()
+    plt.savefig(sp_path)
+    plt.close(fig_sp)
+    spatial_frames.append(sp_path)
 
-    ax4 = fig.add_subplot(2, 2, 4)
-    sc4 = ax4.scatter(sorted_y, sorted_z, c=sorted_x, cmap='magma', s=50)
-    ax4.set_xlabel('1 / Proximity')
-    ax4.set_ylabel('Productivity')
-    ax4.set_title('Productivity vs Proximity (Color=Compactness)')
-    plt.colorbar(sc4, ax=ax4)
-except Exception as e:
-    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
-    sc0 = axs[0, 0].scatter(sorted_x, sorted_y, c=sorted_z, cmap='viridis', s=50)
-    axs[0, 0].set_xlabel('1 / Compactness')
-    axs[0, 0].set_ylabel('1 / Proximity')
-    axs[0, 0].set_title('Proximity vs Compactness')
-    plt.colorbar(sc0, ax=axs[0, 0])
+    # --- Frame 2: Convergence du Front de Pareto ---
+    fig_pr, ax_pr = plt.subplots(figsize=(8, 6))
+    if pareto_fits:
+        px = [f[0] for f in pareto_fits] # Compactness C (Min)
+        py = [f[1] for f in pareto_fits] # Proximity P (Min)
+        pz = [f[2] for f in pareto_fits] # Productivity R (Max)
+        sc = ax_pr.scatter(px, py, c=pz, cmap='viridis', s=60, edgecolors='k')
+        plt.colorbar(sc, ax=ax_pr, label='Productivité R (Max)')
+    ax_pr.set_xlabel('Compacité C (Min - périmètre²/surface)')
+    ax_pr.set_ylabel('Proximité P (Min - distance)')
+    ax_pr.set_title(f"NSGA-II - Génération {gen:02d} : Convergence Front de Pareto")
+    pr_path = os.path.join(temp_dir, f"pareto_{gen:02d}.png")
+    plt.tight_layout()
+    plt.savefig(pr_path)
+    plt.close(fig_pr)
+    pareto_frames.append(pr_path)
 
-    sc1 = axs[0, 1].scatter(sorted_x, sorted_z, c=sorted_y, cmap='plasma', s=50)
-    axs[0, 1].set_xlabel('1 / Compactness')
-    axs[0, 1].set_ylabel('Productivity')
-    axs[0, 1].set_title('Productivity vs Compactness')
-    plt.colorbar(sc1, ax=axs[0, 1])
+# Assemblage des fichiers GIF avec PIL
+def build_gif(frame_list, output_name, duration=350):
+    images = [Image.open(f) for f in frame_list]
+    if images:
+        images[0].save(output_name, save_all=True, append_images=images[1:], duration=duration, loop=0)
+        print(f"GIF créé avec succès : {output_name}")
 
-    sc2 = axs[1, 0].scatter(sorted_y, sorted_z, c=sorted_x, cmap='magma', s=50)
-    axs[1, 0].set_xlabel('1 / Proximity')
-    axs[1, 0].set_ylabel('Productivity')
-    axs[1, 0].set_title('Productivity vs Proximity')
-    plt.colorbar(sc2, ax=axs[1, 0])
+build_gif(spatial_frames, "spatial_evolution.gif")
+build_gif(pareto_frames, "pareto_convergence.gif")
 
-    axs[1, 1].plot(range(len(sorted_data)), sorted_x, label='1 / Compactness', marker='o')
-    axs[1, 1].plot(range(len(sorted_data)), sorted_y, label='1 / Proximity', marker='s')
-    axs[1, 1].plot(range(len(sorted_data)), sorted_z, label='Productivity', marker='^')
-    axs[1, 1].set_xlabel('PROMETHEE Rank Index')
-    axs[1, 1].set_ylabel('Objective Value')
-    axs[1, 1].set_title('Solutions Pareto classées (PROMETHEE II)')
-    axs[1, 1].legend()
+# Nettoyage des images temporaires
+for f in spatial_frames + pareto_frames:
+    if os.path.exists(f):
+        os.remove(f)
+if os.path.exists(temp_dir):
+    os.rmdir(temp_dir)
+
+# 7. Visualisation finale statique de la Frontière de Pareto
+sorted_x = [p[0] for p in sorted_data] # Compactness C
+sorted_y = [p[1] for p in sorted_data] # Proximity P
+sorted_z = [p[2] for p in sorted_data] # Productivity R
+
+fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+sc0 = axs[0, 0].scatter(sorted_x, sorted_y, c=sorted_z, cmap='viridis', s=50)
+axs[0, 0].set_xlabel('Compacité C (Min)')
+axs[0, 0].set_ylabel('Proximité P (Min)')
+axs[0, 0].set_title('Proximité vs Compacité')
+plt.colorbar(sc0, ax=axs[0, 0])
+
+sc1 = axs[0, 1].scatter(sorted_x, sorted_z, c=sorted_y, cmap='plasma', s=50)
+axs[0, 1].set_xlabel('Compacité C (Min)')
+axs[0, 1].set_ylabel('Productivité R (Max)')
+axs[0, 1].set_title('Productivité vs Compacité')
+plt.colorbar(sc1, ax=axs[0, 1])
+
+sc2 = axs[1, 0].scatter(sorted_y, sorted_z, c=sorted_x, cmap='magma', s=50)
+axs[1, 0].set_xlabel('Proximité P (Min)')
+axs[1, 0].set_ylabel('Productivité R (Max)')
+axs[1, 0].set_title('Productivité vs Proximité')
+plt.colorbar(sc2, ax=axs[1, 0])
+
+axs[1, 1].plot(range(len(sorted_data)), sorted_x, label='Compacité C (Min)', marker='o')
+axs[1, 1].plot(range(len(sorted_data)), sorted_y, label='Proximité P (Min)', marker='s')
+axs[1, 1].plot(range(len(sorted_data)), sorted_z, label='Productivité R (Max)', marker='^')
+axs[1, 1].set_xlabel('Rang PROMETHEE II')
+axs[1, 1].set_ylabel('Valeur Physique Brute')
+axs[1, 1].set_title('Solutions Pareto classées (PROMETHEE II)')
+axs[1, 1].legend()
 
 plt.tight_layout()
 plt.savefig("pareto_frontier.png")
 plt.close()
 
-print("Execution terminee avec succes! Figures enregistrees sous input_maps.png et pareto_frontier.png.")
-
+print("Execution terminee avec succes! Animations GIF et figures générées.")

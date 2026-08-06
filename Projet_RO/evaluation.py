@@ -32,47 +32,45 @@ def calculate_pro(subgroup_coords, pro_map):
 
 def calculate_global_objectives(subgroup_coords, proximity_map, productivity_map):
     """
-    Returns a tuple of 3 objective values to be MAXIMIZED:
-    1. Compactness score (1 / C_S): higher means more compact parcel shape.
-    2. Proximity score (1 / P_S): higher means closer to existing infrastructure/parcels.
-    3. Productivity score (R_S): higher means greater agricultural yield.
+    Returns a tuple of 3 raw physical objective values:
+    1. Compactness C(S) = Perimeter^2 / (4 * pi * Area)  [MINIMIZE - closer to 1.0 is more compact]
+    2. Proximity P(S) = Average distance to existing parcels [MINIMIZE - closer is better]
+    3. Productivity R(S) = Average crop yield               [MAXIMIZE - higher yield is better]
     """
     if not subgroup_coords:
-        return (0.0, 0.0, 0.0)
+        return (float('inf'), float('inf'), 0.0)
 
     total_area = sum(len(subgroup) for subgroup in subgroup_coords)
     if total_area == 0:
-        return (0.0, 0.0, 0.0)
+        return (float('inf'), float('inf'), 0.0)
 
     weights = np.array([float(len(subgroup)) / total_area for subgroup in subgroup_coords])
 
     local_compactnesses = calculate_compactness(subgroup_coords)
-    global_compactness = np.average(local_compactnesses, weights=weights) if len(local_compactnesses) > 0 else 1.0
+    global_compactness = np.average(local_compactnesses, weights=weights) if len(local_compactnesses) > 0 else float('inf')
 
     local_proximities = calculate_pro(subgroup_coords, proximity_map)
-    global_proximity = np.average(local_proximities) if len(local_proximities) > 0 else 1.0
+    global_proximity = np.average(local_proximities) if len(local_proximities) > 0 else float('inf')
 
     local_productivities = calculate_pro(subgroup_coords, productivity_map)
     global_productivity = np.average(local_productivities) if len(local_productivities) > 0 else 0.0
 
-    inv_compactness = 1.0 / global_compactness if global_compactness > 0 else 0.0
-    inv_proximity = 1.0 / global_proximity if global_proximity > 0 else 0.0
-
-    return (inv_compactness, inv_proximity, global_productivity)
+    return (global_compactness, global_proximity, global_productivity)
 
 
 def evaluate_individual(individual, proximity_map, productivity_map, cost_map=None, budget=None):
     """
-    Multi-objective evaluation returning a tuple (inv_compactness, inv_proximity, productivity).
+    Multi-objective evaluation returning raw tuple (compactness_C, proximity_P, productivity_R).
     Applies penalty if budget constraint is violated.
     """
     if cost_map is not None and budget is not None:
         cost = np.sum(cost_map[individual == 2])
         if cost > budget:
-            return (0.0, 0.0, 0.0)
+            return (float('inf'), float('inf'), 0.0)
 
     subgroup_coords, _ = subgroups(individual.copy())
     return calculate_global_objectives(subgroup_coords, proximity_map, productivity_map)
+
 
 
 def calculate_global_compactness(subgroup_coords):

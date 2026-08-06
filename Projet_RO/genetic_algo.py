@@ -26,11 +26,18 @@ def generate_population(Map, cost_map, pop_size, budget):
 
 def Pareto_dominates(fitness1, fitness2):
     """
-    Returns True if fitness1 Pareto-dominates fitness2 (assuming maximization of all objectives).
+    Returns True if fitness1 Pareto-dominates fitness2:
+      - Objective 1: Compactness C(S)   [MINIMIZE: c1 <= c2]
+      - Objective 2: Proximity P(S)     [MINIMIZE: p1 <= p2]
+      - Objective 3: Productivity R(S)  [MAXIMIZE: r1 >= r2]
     """
-    not_worse = all(x >= y for x, y in zip(fitness1, fitness2))
-    strictly_better = any(x > y for x, y in zip(fitness1, fitness2))
+    c1, p1, r1 = fitness1
+    c2, p2, r2 = fitness2
+
+    not_worse = (c1 <= c2) and (p1 <= p2) and (r1 >= r2)
+    strictly_better = (c1 < c2) or (p1 < p2) or (r1 > r2)
     return not_worse and strictly_better
+
 
 
 def fast_non_dominated_sort(population_fitness):
@@ -258,6 +265,13 @@ def multi_objective_ga(Map, cost_map, productivity_map, proximity_map, budget=50
         crowding_distances.update(calculate_crowding_distance(front, fitness_values))
 
     all_solutions = list(population)
+    history_per_gen = [{
+        'generation': 0,
+        'population': list(population),
+        'fitness_values': list(fitness_values),
+        'pareto_front': [population[idx] for idx in fronts[0]] if fronts else [],
+        'pareto_fitness': [fitness_values[idx] for idx in fronts[0]] if fronts else []
+    }]
 
     for i in range(num_generations):
         print("Generation :", i + 1, "/", num_generations)
@@ -293,5 +307,16 @@ def multi_objective_ga(Map, cost_map, productivity_map, proximity_map, budget=50
         )
 
         all_solutions.extend(population)
+        
+        # Save snapshot for GIF visualization
+        cur_fronts, _ = fast_non_dominated_sort(fitness_values)
+        history_per_gen.append({
+            'generation': i + 1,
+            'population': list(population),
+            'fitness_values': list(fitness_values),
+            'pareto_front': [population[idx] for idx in cur_fronts[0]] if cur_fronts else [],
+            'pareto_fitness': [fitness_values[idx] for idx in cur_fronts[0]] if cur_fronts else []
+        })
 
-    return all_solutions
+    return all_solutions, history_per_gen
+
