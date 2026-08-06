@@ -16,9 +16,18 @@ The framework combines **NSGA-II (Non-dominated Sorting Genetic Algorithm II)** 
 Agricultural extension requires balancing competing spatial and economic goals over complex geographic landscapes without arbitrary scalar weighting:
 
 1. **Productivity ($R_S$)** *(Maximize)*: Maximizes crop yields across selected agricultural cells based on production maps.
-2. **Proximity ($1/P_S$)** *(Maximize)*: Minimizes average distance to existing agricultural infrastructure and farm nodes.
-3. **Compactness ($1/C_S$)** *(Maximize)*: Maximizes shape compactness using the isoperimetric quotient ($C_S = \frac{\text{Perimeter}^2}{4 \pi \cdot \text{Area}}$), penalizing irregular, fragmented parcels.
-4. **Budget Constraint**: Enforces a hard budget ceiling ($\sum \text{Cost}(cell) \le B$) across candidate land cells.
+2. **Proximity ($P_S$)** *(Minimize)*: Minimizes average Euclidean distance from candidate parcels to existing agricultural infrastructure.
+3. **Compactness ($C_S$)** *(Minimize)*: Minimizes the isoperimetric shape quotient ($C_S = \frac{\text{Perimeter}^2}{4 \pi \cdot \text{Area}}$), favoring contiguous, well-grouped parcel blocks (close to 1.0) over fragmented "confetti" shapes.
+4. **Budget Constraint**: Enforces a strict budget ceiling ($\sum \text{Cost}(cell) \le B$) across all newly acquired land cells.
+
+---
+
+## 🎯 Core Goal
+
+The goal of this project is to automate spatial land-use decision making for farm extension:
+- **Input**: Geographic land usage map, soil productivity map, land acquisition cost map, and budget limit.
+- **Process**: NSGA-II evolutionary search identifies the non-dominated Pareto-optimal land configurations balancing yield, proximity, and shape compactness.
+- **Output**: Ranked land allocation configurations (via PROMETHEE II) alongside animated GIF visualizations showing spatial parcel evolution.
 
 ---
 
@@ -26,8 +35,9 @@ Agricultural extension requires balancing competing spatial and economic goals o
 
 ### 1. Multi-Fitness Pareto Dominance (Abandoning Scalar Sums)
 Previous scalar implementations summed normalized objectives ($R(S) + \frac{1}{P(S)} + C(S)$), introducing bias and scaling artifacts. The new architecture implements pure **Multi-Objective Pareto Dominance**:
-* **Vectorized Evaluation**: `evaluate_individual` returns an objective tuple `(1/Compactness, 1/Proximity, Productivity)`.
-* **Pareto Dominance**: Individual $A$ dominates $B$ ($A \succ B$) iff $A$ is non-worse across all objectives and strictly superior in at least one.
+* **Vectorized Evaluation**: `evaluate_individual` returns raw physical objective vectors `(Compactness_C, Proximity_P, Productivity_R)`.
+* **Pareto Dominance**: Individual $A$ dominates $B$ ($A \succ B$) iff $A$ is non-worse across all objectives ($C_A \le C_B, P_A \le P_B, R_A \ge R_B$) and strictly superior in at least one objective.
+
 
 ### 2. Native NSGA-II Implementation
 * **Fast Non-Dominated Sorting**: Partitions the population into Pareto fronts ($F_1, F_2, \dots, F_k$).
