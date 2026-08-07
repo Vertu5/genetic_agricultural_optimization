@@ -80,17 +80,25 @@ def get_visualization_map(base_map, solution_map=None):
         
     return vis_map
 
-def get_custom_colormap_and_legend():
+def get_custom_colormap_and_legend(lang='fr'):
     """
     Returns discrete colormap and patches for land classification legend.
     """
     colors = ['#374151', '#BAE6FD', '#15803D', '#F59E0B']
     cmap = ListedColormap(colors)
     
-    patches = [
-        mpatches.Patch(color='#374151', label='Restreint R (Non achetable)'),
-        mpatches.Patch(color='#BAE6FD', label='Candidate C (Disponible)'),
-        mpatches.Patch(color='#15803D', label='Ferme Existante A (Possédée)'),
-        mpatches.Patch(color='#F59E0B', label='Nouvelle Extension (Achetée)')
-    ]
+    if lang == 'en':
+        patches = [
+            mpatches.Patch(color='#374151', label='Restricted R (Not purchasable)'),
+            mpatches.Patch(color='#BAE6FD', label='Candidate C (Available)'),
+            mpatches.Patch(color='#15803D', label='Existing Farm A (Owned)'),
+            mpatches.Patch(color='#F59E0B', label='New Extension (Purchased)')
+        ]
+    else:
+        patches = [
+            mpatches.Patch(color='#374151', label='Restreint R (Non achetable)'),
+            mpatches.Patch(color='#BAE6FD', label='Candidate C (Disponible)'),
+            mpatches.Patch(color='#15803D', label='Ferme Existante A (Possédée)'),
+            mpatches.Patch(color='#F59E0B', label='Nouvelle Extension (Achetée)')
+        ]
     return cmap, patches

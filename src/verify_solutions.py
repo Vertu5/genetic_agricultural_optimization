@@ -28,10 +28,10 @@ from evaluation import *
 from genetic_algo import *
 from prometh import *
 
-def run_verification(best_solutions=None):
+def run_verification(best_solutions=None, lang='fr'):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DATA_DIR = os.path.join(BASE_DIR, "data")
-    OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+    OUTPUT_DIR = os.path.join(BASE_DIR, "outputs", lang)
     
     print("=" * 65)
     print("🔍 RUNNING PARETO SOLUTION VERIFICATION & 3D SURFACE AUDIT")
@@ -157,14 +157,20 @@ def run_verification(best_solutions=None):
         label='Solution N°1 (PROMETHEE II - Meilleur compromis)'
     )
     
-    ax_3d.set_xlabel('Compacité C (Min)', fontsize=11, labelpad=10)
-    ax_3d.set_ylabel('Proximité P (Min)', fontsize=11, labelpad=10)
-    ax_3d.set_zlabel('Productivité R (Max)', fontsize=11, labelpad=10)
-    ax_3d.set_title('Frontière de Pareto 3D (Surface & Triangulation)', fontsize=13, fontweight='bold', pad=15)
+    ax_3d.set_xlabel('Compactness C' if lang == 'en' else 'Compacité C')
+    ax_3d.set_ylabel('Proximity P' if lang == 'en' else 'Proximité P')
+    ax_3d.set_zlabel('Productivity R' if lang == 'en' else 'Productivité R')
+    ax_3d.set_title('3D Pareto Frontier (Multi-Objective)' if lang == 'en' else 'Frontière de Pareto 3D (Multi-Objectif)', pad=20, fontsize=16)
     
-    cbar = plt.colorbar(sc, ax=ax_3d, shrink=0.6, pad=0.1)
-    cbar.set_label('Flux Net PROMETHEE II (φ)', fontsize=10)
-    ax_3d.legend(loc='upper right')
+    # Legend
+    proxy_all = plt.Line2D([0], [0], linestyle="none", c='purple', marker='o', alpha=0.5, markersize=8)
+    proxy_best = plt.Line2D([0], [0], linestyle="none", c='red', marker='*', markersize=15)
+    ax_3d.legend(
+        [proxy_all, proxy_best], 
+        ['Pareto Solutions' if lang == 'en' else 'Solutions Pareto', 'PROMETHEE Rank 1' if lang == 'en' else 'Rang 1 PROMETHEE'], 
+        loc='upper left',
+        fontsize=14
+    )
     ax_3d.view_init(elev=25, azim=135)
     
     plot3d_png_path = os.path.join(OUTPUT_DIR, "pareto_frontier_3d.png")
@@ -241,7 +247,7 @@ def run_verification(best_solutions=None):
         os.makedirs(temp_dir, exist_ok=True)
         
         tour_frames = []
-        cmap_land, patches_land = get_custom_colormap_and_legend()
+        total_solutions = len(ranking_indices)
         
         # Sample solutions ordered by PROMETHEE II rank
         sample_indices = ranking_indices[::max(1, len(ranking_indices) // 30)]
@@ -250,36 +256,39 @@ def run_verification(best_solutions=None):
             
         for step_idx, sol_idx in enumerate(sample_indices):
             sol_map = best_solutions[sol_idx] if sol_idx < len(best_solutions) else best_solutions[0]
-            vis_map = get_visualization_map(Map, sol_map)
             
             sol_c, sol_p, sol_r = data[sol_idx]
             sol_phi = net_flows[sol_idx]
-            rank_num = np.where(ranking_indices == sol_idx)[0][0] + 1
+            rank = np.where(ranking_indices == sol_idx)[0][0] + 1
             
-            fig_tour, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(16, 7), gridspec_kw={'width_ratios': [1.2, 1]})
+            fig = plt.figure(figsize=(16, 7))
+            import matplotlib.gridspec as gridspec
+            gs = gridspec.GridSpec(1, 2, width_ratios=[1.2, 1])
             
-            # Left: Spatial Land Allocation Map
-            ax_left.imshow(vis_map, cmap=cmap_land, vmin=0, vmax=3)
-            is_top = (rank_num == 1)
-            title_prefix = "★ RANG 1 (MEILLEUR COMPROMIS)" if is_top else f"Solution Pareto #{sol_idx + 1} (Rang {rank_num}/{len(data)})"
-            ax_left.set_title(f"{title_prefix}\nAllocation Spatiale des Parcelles", fontsize=11, fontweight='bold', color='darkred' if is_top else 'black')
-            ax_left.legend(handles=patches_land, loc='lower center', bbox_to_anchor=(0.5, -0.22), ncol=2, fontsize=8)
+            # Left Panel: 2D Spatial Map
+            ax_map = fig.add_subplot(gs[0])
+            vis_sol = get_visualization_map(Map, sol_map)
+            cmap, patches = get_custom_colormap_and_legend(lang=lang)
+            ax_map.imshow(vis_sol, cmap=cmap, vmin=0, vmax=3)
+            ax_map.set_title(f"Rank {rank}: Spatial Allocation" if lang == 'en' else f"Rang {rank} : Allocation Spatiale", fontsize=16, fontweight='bold')
+            ax_map.legend(handles=patches, loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=12)
             
-            # Right: 3D Pareto Position
-            ax_right = fig_tour.add_subplot(1, 2, 2, projection='3d')
-            ax_right.scatter(data[:, 0], data[:, 1], data[:, 2], c=net_flows, cmap='viridis', s=40, alpha=0.6)
-            ax_right.scatter([sol_c], [sol_p], [sol_r], color='red' if is_top else 'orange', s=160, marker='*' if is_top else 'o', label=f'Current: Rank {rank_num}')
+            # Right Panel: 3D Pareto Position
+            ax_3d_tour = fig.add_subplot(gs[1], projection='3d')
+            ax_3d_tour.scatter(data[:, 0], data[:, 1], data[:, 2], c=net_flows, cmap='viridis', s=40, alpha=0.6)
+            is_top = (rank == 1)
+            ax_3d_tour.scatter([sol_c], [sol_p], [sol_r], color='red' if is_top else 'orange', s=160, marker='*' if is_top else 'o')
             
-            ax_right.set_xlabel('Compacité C (Min)', fontsize=9)
-            ax_right.set_ylabel('Proximité P (Min)', fontsize=9)
-            ax_right.set_zlabel('Productivité R (Max)', fontsize=9)
-            ax_right.set_title(f"Score: C={sol_c:.2f} | P={sol_p:.2f} | R={sol_r:.2f}\nFlux Net PROMETHEE φ={sol_phi:.3f}", fontsize=11)
-            ax_right.view_init(elev=25, azim=135)
+            ax_3d_tour.set_xlabel('Compactness C' if lang == 'en' else 'Compacité C')
+            ax_3d_tour.set_ylabel('Proximity P' if lang == 'en' else 'Proximité P')
+            ax_3d_tour.set_zlabel('Productivity R' if lang == 'en' else 'Productivité R')
+            ax_3d_tour.set_title(f"Pareto Tour (Rank {rank}/{total_solutions})" if lang == 'en' else f"Tour Pareto (Rang {rank}/{total_solutions})", fontsize=16)
+            ax_3d_tour.view_init(elev=25, azim=135)
             
             plt.tight_layout()
             frame_path = os.path.join(temp_dir, f"tour_{step_idx:03d}.png")
             plt.savefig(frame_path, dpi=120)
-            plt.close(fig_tour)
+            plt.close(fig)
             tour_frames.append(frame_path)
             
         # Build GIF
@@ -296,7 +305,19 @@ def run_verification(best_solutions=None):
         if os.path.exists(temp_dir):
             os.rmdir(temp_dir)
             
-    print("=" * 65)
-
+    print(f"🎉 Terminé. {total_solutions} frames extraites et GIF {gif_path} créé.")
+    
 if __name__ == "__main__":
-    run_verification()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lang', type=str, default='fr', choices=['fr', 'en'])
+    args = parser.parse_args()
+    plt.rcParams.update({
+        'font.size': 14,
+        'axes.labelsize': 16,
+        'axes.titlesize': 18,
+        'legend.fontsize': 14,
+        'xtick.labelsize': 12,
+        'ytick.labelsize': 12
+    })
+    run_verification(lang=args.lang)
