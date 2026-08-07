@@ -1,5 +1,7 @@
 # 🌾 Genetic Agricultural Optimization (NSGA-II + PROMETHEE II)
 
+*Read this document in other languages: [Français 🇫🇷](README.fr.md)*
+
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Algorithm: NSGA--II](https://img.shields.io/badge/Algorithm-NSGA--II-green.svg)](https://en.wikipedia.org/wiki/NSGA-II)
@@ -76,11 +78,14 @@ genetic_agricultural_optimization/
 │   └── generator.py                    # Initial heuristic generators
 │
 ├── outputs/                            # Optimization results and visualizations
-│   ├── pareto.csv                      # Exported Pareto-optimal solutions
-│   ├── input_maps.png                  # Visualized input geographic maps
-│   ├── pareto_frontier.png             # Visualized 3D Pareto frontier & 2D projections
-│   ├── spatial_evolution.gif           # Animated spatial parcel evolution
-│   └── pareto_convergence.gif          # Animated Pareto frontier convergence
+│   ├── en/                             # English localized outputs
+│   │   ├── pareto.csv                  # Exported Pareto-optimal solutions
+│   │   ├── input_maps.png              # Visualized input geographic maps
+│   │   ├── pareto_frontier_3d.png      # Visualized 3D Pareto frontier
+│   │   ├── spatial_evolution.gif       # Animated spatial parcel evolution
+│   │   ├── pareto_convergence.gif      # Animated Pareto frontier convergence
+│   │   └── pareto_solutions_tour.gif   # Interactive 3D/2D Pareto tour
+│   └── fr/                             # French localized outputs
 │
 └── docs/                               # Additional project documentation
     └── Projet_exploitation_agricole.pdf
@@ -123,23 +128,23 @@ To make spatial land allocation intuitive, all spatial maps and animations use a
 All generated outputs are saved in the `outputs/` folder.
 
 ### 1. Pareto Solutions Tour (Exploring Trade-offs)
-![Pareto Solutions Tour GIF](outputs/pareto_solutions_tour.gif)
+![Pareto Solutions Tour GIF](outputs/en/pareto_solutions_tour.gif)
 *Animation: Cycles through non-dominated Pareto solutions (ranked via PROMETHEE II). The left panel shows the spatial 4-color parcel map (highlighting newly bought land in gold), while the right 3D panel tracks its position on the Pareto frontier. The Rank 1 solution is specially highlighted as the top compromise choice.*
 
 ### 2. Spatial Configuration Evolution (NSGA-II)
-![Spatial Evolution GIF](outputs/spatial_evolution.gif)
+![Spatial Evolution GIF](outputs/en/spatial_evolution.gif)
 *Animation: The algorithm progressively explores land configurations across generations, converging from scattered parcels to contiguous blocks near existing fields.*
 
 ### 3. Pareto Frontier Convergence
-![Pareto Convergence GIF](outputs/pareto_convergence.gif)
+![Pareto Convergence GIF](outputs/en/pareto_convergence.gif)
 *Animation: The population converging towards the true Pareto frontier across generations.*
 
 ### 4. Static 3D Pareto Surface & Frontier
-![3D Pareto Frontier Surface](outputs/pareto_frontier_3d.png)
+![3D Pareto Frontier Surface](outputs/en/pareto_frontier_3d.png)
 *3D Surface Plot: Displays the smooth 3D Pareto surface mesh and non-dominated solutions along Compactness ($X$), Proximity ($Y$), and Productivity ($Z$), color-coded by PROMETHEE II net preference flows ($\Phi$).*
 
 ### 5. Interactive 3D Surface Visualization
-An interactive 3D HTML plot is generated at `outputs/pareto_3d_interactive.html`. Open it in any web browser to rotate, zoom, and inspect exact objective values and PROMETHEE II ranks for each solution.
+An interactive 3D HTML plot is generated at `outputs/en/pareto_3d_interactive.html`. Open it in any web browser to rotate, zoom, and inspect exact objective values and PROMETHEE II ranks for each solution.
 
 ---
 
@@ -163,10 +168,10 @@ pip install -r requirements.txt
 
 ### 2. Execution
 
-Run the complete multi-objective optimization pipeline from the repository root:
+Run the complete multi-objective optimization pipeline from the repository root. You can specify the output language using the `--lang` flag (defaults to `fr`):
 
 ```bash
-python3 src/main.py
+python3 src/main.py --lang en
 ```
 
 ---
