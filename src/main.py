@@ -69,7 +69,7 @@ else:
     proximity_map = np.ones_like(Map, dtype=float) * 9.0
 
 # Decision variable
-budget_limit = 500
+budget_limit = 1000
 DecisionMap = Decision_map(read_file(usage_map_path))
 DecisionMap = preprocess(DecisionMap, productivity_map, proximity_map, cost_map, budget_limit)
 Min_prox = select_proximity(proximity_map, DecisionMap, cost_map, budget=budget_limit)
@@ -108,8 +108,8 @@ best_solutions, history_per_gen = multi_objective_ga(
     productivity_map, 
     proximity_map, 
     budget=budget_limit, 
-    pop_size=40, 
-    num_generations=20
+    pop_size=100, 
+    num_generations=100
 )
 
 # 3. Évaluation des objectifs physiques bruts pour chaque solution trouvée
